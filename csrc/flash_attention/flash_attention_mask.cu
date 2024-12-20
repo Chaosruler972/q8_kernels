@@ -4,11 +4,16 @@
 #include <cuda_runtime.h>
 #include <iostream>
 #include <stdio.h>
-#include <cutlass/numeric_conversion.h>
-#include <cutlass/numeric_types.h>
+// #include <cutlass/numeric_conversion.h>
+// #include <cutlass/numeric_types.h>
 #include <vector>
 
 #include "cute/algorithm/copy.hpp"
+#include <cute/algorithm/gemm.hpp>
+#include <cute/container/array_subbyte.hpp>
+#include <cute/container/array.hpp>
+#define float_e4m3_t __hip_fp8_e4m3_fnuz
+#include <cute/algorithm/clear.hpp>
 
 #include "cutlass/cutlass.h"
 #include "cutlass/layout/layout.h"
@@ -19,6 +24,10 @@
 
 #include "sm89_mma.hpp"
 #include "mma_sm89_traits.hpp"
+
+#include <hip/hip_fp8.h>
+
+#define __nv_fp8x2_e5m2 __hip_fp8x4_e5m2_fnuz
 
 
 namespace flash {
@@ -175,14 +184,13 @@ inline __device__ void scale_apply_exp2(Tensor<Engine0, Layout0> &tensor, Tensor
     // constexpr float sm_scale = softmax_scale*1.44269504f;
     #pragma unroll
     for (int mi = 0; mi < size<0>(tensor); ++mi) {
-        const float max_scaled = max(mi) == -INFINITY ? 0.0f : max(mi) * softmax_scale;
+        const float max_scaled = max(mi) == -INFINITY ? 0.0f : -max(mi) * softmax_scale;
         #pragma unroll
         for (int ni = 0; ni < size<1>(tensor); ++ni)  {
-            tensor(mi, ni) =  exp2f(tensor(mi, ni) * softmax_scale - max_scaled + 8.0f);        
+            tensor(mi, ni) =  exp2f(tensor(mi, ni) * softmax_scale + max_scaled);        
         }
     }
 }
-
 
 
 template<typename Layout>
@@ -241,7 +249,7 @@ inline __device__ void apply_mask(Tensor<Engine, Layout> &tensor_,
             const int col_idx = col_idx_base + j;
             #pragma unroll
             for (int mi = 0; mi < size<0>(tensor); ++mi) {
-                if (col_idx >= max_seqlen_k) { tensor(mi, make_coord(j, nj)) = -INFINITY; }
+                if (col_idx >= max_seqlen_k) { tensor(mi, make_coord(j, nj)) = -1000000.0f; }
             }
         }
     }
@@ -251,10 +259,10 @@ inline __device__ void apply_mask(Tensor<Engine, Layout> &tensor_,
 } 
 
 template<bool Is_Even=true>
-__global__ void flash_attention_v2_cutlass_kernel(
-    float_e4m3_t* Q_ptr, float_e4m3_t* K_ptr, float_e4m3_t* V_ptr, 
+__global__ void flash_attention_v2_cutlass_mask_kernel(
+    float_e4m3_t* Q_ptr, float_e4m3_t* K_ptr, float_e4m3_t* V_ptr, int* BatchMask,
     float_e4m3_t* O_ptr, 
-    size_t BATCH, size_t M, size_t N, float softmax_scale
+    size_t BATCH, size_t HEADS, size_t M, size_t N, float softmax_scale
 ) {
 
     using namespace cute;
@@ -315,8 +323,9 @@ __global__ void flash_attention_v2_cutlass_kernel(
     const int bs_head_offset_q = base_id * kHeadDim * M;
     const int bs_head_offset_k = base_id * kHeadDim * N;
     const int bs_head_offset_v = base_id * kHeadDim * V_N;
-    
 
+    const int MASK_N = BatchMask[base_id / (int)HEADS];    
+   
     Tensor Q = make_tensor(
         make_gmem_ptr(Q_ptr + bs_head_offset_q),
         make_shape(M, Int<kHeadDim>{}),
@@ -425,7 +434,7 @@ __global__ void flash_attention_v2_cutlass_kernel(
             smem_thr_copy_Q, smem_thr_copy_K
         );
 
-        flash::apply_mask(rAccScore, n_block * kBlockN, N);
+        flash::apply_mask(rAccScore, n_block * kBlockN, MASK_N);
         Tensor scores = make_tensor(rAccScore.data(), flash::convert_layout_acc_rowcol(rAccScore.layout()));
         flash::cp_async_wait<0>();
         __syncthreads();
@@ -457,7 +466,7 @@ __global__ void flash_attention_v2_cutlass_kernel(
         flash::gemm_smem(rAccScore, tSrQ, tSrK, tSsQ, tSsK, tiled_mma, smem_tiled_copy_Q, smem_tiled_copy_K,
             smem_thr_copy_Q, smem_thr_copy_K
         );
-
+        flash::apply_mask(rAccScore, n_block * kBlockN, MASK_N);
         Tensor scores = make_tensor(rAccScore.data(), flash::convert_layout_acc_rowcol(rAccScore.layout()));
 
         flash::cp_async_wait<0>();
@@ -534,7 +543,7 @@ __global__ void flash_attention_v2_cutlass_kernel(
 }
 
 
-void flash_attention_cuda(void* Q_ptr, void* K_ptr, void* V_ptr, 
+void flash_attention_cuda_mask(void* Q_ptr, void* K_ptr, void* V_ptr, int* BatchMask,
                    void* O_ptr, 
                    size_t BATCH, size_t M, size_t N, size_t NUM_HEADS, float softmax_scale, cudaStream_t stream){
 
@@ -546,25 +555,26 @@ void flash_attention_cuda(void* Q_ptr, void* K_ptr, void* V_ptr,
         dim3 grid(num_m_block, BATCH * NUM_HEADS, 1);
         dim3 block(threads);
         if(M % M_BLOCK == 0 && N % N_BLOCK == 0 ){
-            auto kernel = &flash_attention_v2_cutlass_kernel<true>;
+            auto kernel = &flash_attention_v2_cutlass_mask_kernel<true>;
             int smem_size = int(N_BLOCK*64*2 + M_BLOCK*64);
             if (smem_size >= 48 * 1024) {
-                cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
+                cudaFuncSetAttribute((const void*) kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
             }
-            kernel<<<grid, block, smem_size, stream>>>((float_e4m3_t*)Q_ptr, (float_e4m3_t*)K_ptr, (float_e4m3_t*)V_ptr, (float_e4m3_t*)O_ptr, BATCH, M, N, softmax_scale);
-           
+            kernel<<<grid, block, smem_size, stream>>>((float_e4m3_t*)Q_ptr, (float_e4m3_t*)K_ptr, (float_e4m3_t*)V_ptr, BatchMask, (float_e4m3_t*)O_ptr, BATCH, NUM_HEADS, M, N, softmax_scale);
+            // C10_CUDA_KERNEL_LAUNCH_CHECK();
         } else {
-            auto kernel = &flash_attention_v2_cutlass_kernel<false>;
+            auto kernel = &flash_attention_v2_cutlass_mask_kernel<false>;
             int smem_size = int(N_BLOCK*64*2 + M_BLOCK*64);
             if (smem_size >= 48 * 1024) {
-                cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
+                cudaFuncSetAttribute((const void*) kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
             }
-            kernel<<<grid, block, smem_size, stream>>>((float_e4m3_t*)Q_ptr, (float_e4m3_t*)K_ptr, (float_e4m3_t*)V_ptr, (float_e4m3_t*)O_ptr, BATCH, M, N, softmax_scale);
+            kernel<<<grid, block, smem_size, stream>>>((float_e4m3_t*)Q_ptr, (float_e4m3_t*)K_ptr, (float_e4m3_t*)V_ptr, BatchMask, (float_e4m3_t*)O_ptr, BATCH, NUM_HEADS, M, N, softmax_scale);
+            // C10_CUDA_KERNEL_LAUNCH_CHECK();
         }
-
+        
 }
 
 
-void flash_attention_cuda(void* Q_ptr, void* K_ptr, void* V_ptr, 
+void flash_attention_cuda_mask(void* Q_ptr, void* K_ptr, void* V_ptr, int* BatchMask,
                    void* O_ptr, 
                    size_t BATCH, size_t M, size_t N, size_t NUM_HEADS, float softmax_scale, cudaStream_t stream);

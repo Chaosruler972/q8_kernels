@@ -81,11 +81,15 @@ static __device__ inline T run(T x, Operator &op) {
     }
 };
 
+constexpr int constexpr_min(int a, int b) {
+    return (a < b) ? a : b;
+}
+
 template<typename Ktraits>
 __global__ __launch_bounds__(Ktraits::kNThreads)
 void tokenwise_quantization_kernel(QuantizerParamsBase params) {
     constexpr int kNThreads = Ktraits::kNThreads;
-    constexpr int kWarpSize = std::min(kNThreads, 32);
+    constexpr int kWarpSize = constexpr_min(kNThreads, 32);
     constexpr int kNWarps = kNThreads / kWarpSize;
     constexpr int ThreadElems = Ktraits::ThreadElems;
 

@@ -15,8 +15,28 @@ PACKAGE_NAME = "q8_kernels"
 ext_modules = []
 generator_flag = []
 cc_flag = []
-cc_flag.append("-gencode")
-cc_flag.append("arch=compute_89,code=sm_89")
+
+cc_flag.append("")
+
+
+define_macros = [
+    ('make_cuFloatComplex', 'make_hipFloatComplex'),
+    ('cuFloatComplex', 'hipFloatComplex'),
+    ('__nv_bfloat16_raw', '__hip_bfloat16_raw'),
+    ('make_cuDoubleComplex', 'make_hipDoubleComplex'),
+    ('cuCrealf', 'hipCrealf'),
+    ('cuCimagf', 'hipCimagf'),
+    ('cuCreal', 'hipCreal'),
+    ('cuCimag', 'hipCimag'),
+    ('__nv_fp8x2_e4m3', '__hip_fp8x2_e4m3_fnuz'),
+    ('__nv_saturation_t', '__hip_saturation_t'),
+    ('__NV_SATFINITE', '__HIP_SATFINITE'),
+    ('__nv_fp8_interpretation_t', '__hip_fp8_interpretation_t'),
+    ('__NV_E4M3', '__HIP_E4M3_FNUZ'),
+    ('__nv_cvt_float2_to_fp8x2', '__hip_cvt_float2_to_fp8x2'),
+    ('__shfl_xor_sync(a, b, c)', '__shfl_xor(b, c)'),
+    ('__shfl_sync(a, b, c)', '__shfl(b, c)'),
+]
 
 
 # helper function to get cuda version
@@ -32,8 +52,8 @@ def get_cuda_bare_metal_version(cuda_dir):
 if CUDA_HOME is not None:
     _, bare_metal_version = get_cuda_bare_metal_version(CUDA_HOME)
     if bare_metal_version >= Version("11.8"):
-        cc_flag.append("-gencode")
-        cc_flag.append("arch=compute_89,code=sm_89")
+
+        cc_flag.append("")
 
 # ninja build does not work unless include_dirs are abs path
 this_dir = os.path.dirname(os.path.abspath(__file__))
@@ -48,7 +68,8 @@ ext_modules.append(
             "csrc/gemm/q8_matmul_bias.cu",
             "csrc/gemm/q8_matmul.cu",
         ],
-        extra_compile_args={
+        define_macros=define_macros,
+		extra_compile_args={
             # add c compile flags
             "cxx": ["-O3", "-std=c++17"] + generator_flag,
             # add nvcc compile flags
@@ -57,15 +78,15 @@ ext_modules.append(
                     "-std=c++17",
                     "-U__CUDA_NO_HALF_OPERATORS__",
                     "-lineinfo",
-                    "--ptxas-options=-v",
-                    "--ptxas-options=-O2",
+
+
                     "-U__CUDA_NO_HALF_OPERATORS__",
                     "-U__CUDA_NO_HALF_CONVERSIONS__",
                     "-U__CUDA_NO_HALF2_OPERATORS__",
                     "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
-                    "--expt-relaxed-constexpr",
-                    "--expt-extended-lambda",
-                    "--use_fast_math",
+
+
+
 
                 ]
                 + generator_flag
@@ -87,9 +108,10 @@ ext_modules.append(
         name="q8_kernels_cuda.quantizer._C",
         sources=[
             "csrc/quantizer/tokenwise_quant.cpp",
-            "csrc/quantizer/tokenwise_quant_cuda.cu",
+            "csrc/quantizer/tokenwise_quant.cu",
         ],
-          extra_compile_args={
+          define_macros=define_macros,
+		extra_compile_args={
             # add c compile flags
             "cxx": ["-O3", "-std=c++17"] + generator_flag,
             # add nvcc compile flags
@@ -98,15 +120,15 @@ ext_modules.append(
                     "-std=c++17",
                     "-U__CUDA_NO_HALF_OPERATORS__",
                     "-lineinfo",
-                    "--ptxas-options=-v",
-                    "--ptxas-options=-O2",
+
+
                     "-U__CUDA_NO_HALF_OPERATORS__",
                     "-U__CUDA_NO_HALF_CONVERSIONS__",
                     "-U__CUDA_NO_HALF2_OPERATORS__",
                     "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
-                    "--expt-relaxed-constexpr",
-                    "--expt-extended-lambda",
-                    "--use_fast_math",
+
+
+
 
                 ]
                 + generator_flag
@@ -131,18 +153,19 @@ ext_modules.append(
             "csrc/ops/ops_api.cpp",
             
             "csrc/ops/rope.cpp",
-            "csrc/ops/rope_cuda.cu",
+            "csrc/ops/rope.cu",
             
             "csrc/ops/rms_norm.cpp",
-            "csrc/ops/rms_norm_cuda.cu",
+            "csrc/ops/rms_norm.cu",
 
             "csrc/ops/fma.cpp",
-            "csrc/ops/fma_cuda.cu",
+            "csrc/ops/fma.cu",
 
             "csrc/fast_hadamard/fast_hadamard_transform.cpp",
-            "csrc/fast_hadamard/fast_hadamard_transform_cuda.cu"
+            "csrc/fast_hadamard/fast_hadamard_transform.cu"
         ],
-          extra_compile_args={
+          define_macros=define_macros,
+		extra_compile_args={
             # add c compile flags
             "cxx": ["-O3", "-std=c++17"] + generator_flag,
             # add nvcc compile flags
@@ -151,15 +174,15 @@ ext_modules.append(
                     "-std=c++17",
                     "-U__CUDA_NO_HALF_OPERATORS__",
                     "-lineinfo",
-                    "--ptxas-options=-v",
-                    "--ptxas-options=-O2",
+
+
                     "-U__CUDA_NO_HALF_OPERATORS__",
                     "-U__CUDA_NO_HALF_CONVERSIONS__",
                     "-U__CUDA_NO_HALF2_OPERATORS__",
                     "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
-                    "--expt-relaxed-constexpr",
-                    "--expt-extended-lambda",
-                    "--use_fast_math",
+
+
+
 
                 ]
                 + generator_flag
@@ -184,10 +207,11 @@ ext_modules.append(
         name="q8_kernels_cuda.flash_attention._C",
         sources=[
             "csrc/flash_attention/flash_attention.cpp",
-            "csrc/flash_attention/flash_attention_cuda.cu",
-            "csrc/flash_attention/flash_attention_cuda_mask.cu",
+            "csrc/flash_attention/flash_attention.cu",
+            "csrc/flash_attention/flash_attention_mask.cu",
         ],
-          extra_compile_args={
+          define_macros=define_macros,
+		extra_compile_args={
             # add c compile flags
             "cxx": ["-O3", "-std=c++17"] + generator_flag,
             # add nvcc compile flags
@@ -195,16 +219,16 @@ ext_modules.append(
                     "-O3",
                     "-std=c++17",
                     "-U__CUDA_NO_HALF_OPERATORS__",
-                    "--use_fast_math",
+
                     "-lineinfo",
-                    "--ptxas-options=-v",
-                    "--ptxas-options=-O2",
+
+
                     "-U__CUDA_NO_HALF_OPERATORS__",
                     "-U__CUDA_NO_HALF_CONVERSIONS__",
                     "-U__CUDA_NO_HALF2_OPERATORS__",
                     "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
-                    "--expt-relaxed-constexpr",
-                    "--expt-extended-lambda",
+
+
                 ]
                 + generator_flag
                 + cc_flag,

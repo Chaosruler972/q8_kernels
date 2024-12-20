@@ -6,6 +6,7 @@
 #include <cute/layout.hpp>
 
 #include <cutlass/numeric_types.h>
+#include <hip/hip_fp8.h>
 
 namespace cute
 {
@@ -31,8 +32,8 @@ template <>
 struct MMA_Traits<SM89_16x8x32_F32F8F8F32_E4M3_TN>
 {
      using ValTypeD = float;
-     using ValTypeA = cutlass::float_e4m3_t;
-     using ValTypeB = cutlass::float_e4m3_t;
+     using ValTypeA = float_e4m3_t;
+     using ValTypeB = float_e4m3_t;
      using ValTypeC = float;
 
      using Shape_MNK = Shape<_16,_8,_32>;
@@ -48,8 +49,8 @@ template <>
 struct MMA_Traits<SM89_16x8x32_F32F8F8F32_E5M2_TN>
 {
     using ValTypeD = float;
-    using ValTypeA = cutlass::float_e5m2_t;
-    using ValTypeB = cutlass::float_e5m2_t;
+    using ValTypeA = float_e5m2_t;
+    using ValTypeB = float_e5m2_t;
     using ValTypeC = float;
 
     using Shape_MNK = Shape<_16,_8,_32>;

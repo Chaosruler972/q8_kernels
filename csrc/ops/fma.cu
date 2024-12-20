@@ -56,12 +56,15 @@ inline __device__ void store_output(output_t *out, float out_vals[NElems]) {
 }
 
 
+constexpr int constexpr_min(int a, int b) {
+    return (a < b) ? a : b;
+}
 
 template<typename Ktraits>
 __global__ __launch_bounds__(Ktraits::kNThreads)
 void fma_kernel(FMABaseParams params) {
     constexpr int kNThreads = Ktraits::kNThreads;
-    constexpr int kWarpSize = std::min(kNThreads, 32);
+    constexpr int kWarpSize = constexpr_min(kNThreads, 32);
     constexpr int kNWarps = kNThreads / kWarpSize;
     constexpr int ThreadElems = Ktraits::ThreadElems;
 

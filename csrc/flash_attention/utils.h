@@ -11,11 +11,11 @@ __device__ inline float operator()(float const &x, float const &y) { return max(
 };
 
 
-template <>
-struct MaxOp<half2> {
-// This is slightly faster
-__device__ inline half2 operator()(half2 const &x, half2 const &y) { return __hmax2(x, y); }
-};
+// template <>
+// struct MaxOp<half2> {
+// // This is slightly faster
+// __device__ inline half2 operator()(half2 const &x, half2 const &y) { return __hmax2(x, y); }
+// };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 

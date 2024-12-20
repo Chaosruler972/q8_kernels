@@ -1,3 +1,4 @@
+#include <hip/hip_fp8.h>
 #include <torch/extension.h>
 #include <torch/python.h>
 #include "q8_gemm_api.cuh"
@@ -484,9 +485,10 @@ void run_q8_gemm_bias(int8_t *A, int8_t *B,  float* bias, void *C, float* A_scal
     using AScale_VLayoutD = Layout<Shape<_4, _2, _1>, Stride<_1, _4, _8>>;
     using AScale_VLayoutD_View = Layout<Shape<Shape<_2, _2>, _4, _1>, Stride<Stride<_0, _1>, _2, _8>>;
     
+    // using AScaleTV = Layout<Shape<Shape<_4, _8>, Shape<_2, _2>>, Stride<Stride<_0, _8>, Stride<_64, _0>>>;
     using AScaleTV = Layout<Shape<
                                 Shape<
-                                    Shape<_4, _8>, Shape<_2, _2>,
+                                    Shape<_4, _8>, Shape<_2, _2>
                                 >, 
                                 Shape<_2, _4>
                             >, 
@@ -507,7 +509,7 @@ void run_q8_gemm_bias(int8_t *A, int8_t *B,  float* bias, void *C, float* A_scal
 
     using BScaleTV = Layout<Shape<
                                 Shape<
-                                    Shape<_4, _8>, Shape<_2, _2>,
+                                    Shape<_4, _8>, Shape<_2, _2>
                                 >, 
                                 Shape<_2, _8>
                             >, 
@@ -547,7 +549,7 @@ void run_q8_gemm_bias(int8_t *A, int8_t *B,  float* bias, void *C, float* A_scal
                                                 s2r_copy_atom_a, s2r_copy_atom_b, 
                                                 R2SCopyAtomC, S2GCopyAtomC, S2GCopyC>;
                 cudaFuncSetAttribute(
-                                kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shm_size);
+                                (const void *) kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shm_size);
                 kernel<<<grid, block, shm_size, stream>>>((int8_t*)A, (int8_t*)B, bias, A_scales, B_scales, (float_e4m3_t*)C, M, N, K, BATCH););
         );
     );

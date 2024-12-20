@@ -11,7 +11,8 @@
 #include "cutlass/numeric_types.h"
 #include "cutlass/platform/platform.h"
 #include "cutlass/tensor_ref.h"
-#include <cute/tensor.hpp>
+// #include <cute/tensor.hpp>
+
 
 // Reshape Utility for converting the layout from accumulator of GEMM-I
 // to Operand A of GEMM-II.
@@ -38,8 +39,8 @@ struct ReorgCFp8toAFp8{
   int lower_map[4] = {1,2,0,3};
   
   
-CUTLASS_DEVICE ReorgCFp8toAFp8() {
-  int laneId = cutlass::canonical_lane_idx();
+ __forceinline__ __device__ ReorgCFp8toAFp8() {
+  int laneId = threadIdx.x % 32;
   
    if (laneId % 4 == 0 || laneId % 4 == 3) {
      selectorEx0 = 0x3210;
@@ -56,7 +57,7 @@ CUTLASS_DEVICE ReorgCFp8toAFp8() {
 }
 
 template <typename Fragment>
-CUTLASS_DEVICE auto operator()(Fragment &accum) {
+__forceinline__ __device__ auto operator()(Fragment &accum) {
 
   using namespace cute;  
   //   ((_2,_2),_1,_8):((_1,_2),_0,_4)
@@ -84,8 +85,10 @@ CUTLASS_DEVICE auto operator()(Fragment &accum) {
       
       auto upper0 = __byte_perm(upper, lower, selectorEx0);
       auto lower0 = __byte_perm(upper, lower, selectorEx1);      
-      upper0 = __shfl_sync(uint32_t(-1),upper0, upper_map[threadIdx.x%4],4);
-      lower0 = __shfl_sync(uint32_t(-1),lower0, lower_map[threadIdx.x%4],4);
+      // upper0 = __shfl_sync(uint32_t(-1),upper0, upper_map[threadIdx.x%4],4);
+      // lower0 = __shfl_sync(uint32_t(-1),lower0, lower_map[threadIdx.x%4],4);
+      upper0 = __shfl(upper0, upper_map[threadIdx.x%4], 4);
+      lower0 = __shfl(lower0, lower_map[threadIdx.x%4], 4);
   
       uint32_t *data_32bit = reinterpret_cast<uint32_t *>(&data[n]);
       data_32bit[0] = __byte_perm(upper0, lower0, selectorEx4);
