@@ -167,3 +167,6 @@ debug/
 logs.txt
 test_*.py
 attn_test.py
+
+*.hip
+*_hip*
