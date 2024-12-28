@@ -1,3 +1,4 @@
+#include "amdsupport.h"
 #include <c10/util/BFloat16.h>
 #include <c10/util/Half.h>
 #include <c10/util/Float8_e4m3fn.h>
@@ -82,7 +83,7 @@ struct Allreduce {
     template<typename T, typename Operator>
     static __device__ inline T run(T x, Operator &op) {
         constexpr int OFFSET = THREADS / 2;
-        x = op(x, __shfl_xor_sync(uint32_t(-1), x, OFFSET));
+        x = op(x, __shfl_xor_sync(shfl_mask_t(-1), x, OFFSET));
         return Allreduce<OFFSET>::run(x, op);
     }
 };
@@ -91,7 +92,7 @@ template<>
 struct Allreduce<2> {
 template<typename T, typename Operator>
 static __device__ inline T run(T x, Operator &op) {
-        x = op(x, __shfl_xor_sync(uint32_t(-1), x, 1));
+        x = op(x, __shfl_xor_sync(shfl_mask_t(-1), x, 1));
         return x;
     }
 };
@@ -101,7 +102,7 @@ template<typename Ktraits>
 __global__ __launch_bounds__(Ktraits::kNThreads)
 void rms_norm_kernel(RMSNormsParamsBase params) {
     constexpr int kNThreads = Ktraits::kNThreads;
-    constexpr int kWarpSize = std::min(kNThreads, 32);
+    constexpr int kWarpSize = min_constexpr(kNThreads, 32);
     constexpr int kNWarps = kNThreads / kWarpSize;
     constexpr int ThreadElems = Ktraits::ThreadElems;
     constexpr bool norm_affine = Ktraits::norm_affine;

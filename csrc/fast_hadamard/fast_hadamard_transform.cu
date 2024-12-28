@@ -3,7 +3,7 @@
  ******************************************************************************/
 
 // #pragma once
-
+#include "amdsupport.h"
 #include <c10/util/BFloat16.h>
 #include <c10/util/Half.h>
 #include <c10/util/Float8_e4m3fn.h>
@@ -32,7 +32,7 @@ struct fast_hadamard_transform_kernel_traits {
     using vec_t = typename BytesToType<kNBytes * kNElts>::Type;
     static constexpr int kNChunks = N / (kNElts * kNThreads);
     // We don't want to use more than 32 KB of shared memory.
-    static constexpr int kSmemExchangeSize = std::min(N * 4, 32 * 1024);
+    static constexpr int kSmemExchangeSize = min_constexpr(N * 4, 32 * 1024);
     static constexpr int kNExchangeRounds = N * 4 / kSmemExchangeSize;
     static_assert(kNExchangeRounds * kSmemExchangeSize == N * 4);
     static constexpr int kSmemSize = kSmemExchangeSize;
@@ -53,7 +53,7 @@ void fast_hadamard_transform_kernel(HadamardParamsBase params) {
 
     constexpr int kLogNElts = cilog2(Ktraits::kNElts);
     static_assert(1 << kLogNElts == kNElts, "kNElts must be a power of 2");
-    constexpr int kWarpSize = std::min(kNThreads, 32);
+    constexpr int kWarpSize = min_constexpr(kNThreads, 32);
     constexpr int kLogWarpSize = cilog2(kWarpSize);
     static_assert(1 << kLogWarpSize == kWarpSize, "Warp size must be a power of 2");
     constexpr int kNWarps = kNThreads / kWarpSize;
@@ -118,7 +118,7 @@ void fast_hadamard_transform_launch(HadamardParamsBase &params, cudaStream_t str
     auto kernel = &fast_hadamard_transform_kernel<Ktraits>;
     if (kSmemSize >= 48 * 1024) {
         C10_CUDA_CHECK(cudaFuncSetAttribute(
-            kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, kSmemSize));
+            (const void*) kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, kSmemSize));
         }
     kernel<<<grid, Ktraits::kNThreads, kSmemSize, stream>>>(params);
     C10_CUDA_KERNEL_LAUNCH_CHECK();

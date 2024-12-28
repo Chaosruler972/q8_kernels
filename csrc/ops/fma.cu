@@ -1,3 +1,4 @@
+#include "amdsupport.h"
 #include <c10/util/BFloat16.h>
 #include <c10/util/Half.h>
 #include <c10/util/Float8_e4m3fn.h>
@@ -61,7 +62,7 @@ template<typename Ktraits>
 __global__ __launch_bounds__(Ktraits::kNThreads)
 void fma_kernel(FMABaseParams params) {
     constexpr int kNThreads = Ktraits::kNThreads;
-    constexpr int kWarpSize = std::min(kNThreads, 32);
+    constexpr int kWarpSize = min_constexpr(kNThreads, 32);
     constexpr int kNWarps = kNThreads / kWarpSize;
     constexpr int ThreadElems = Ktraits::ThreadElems;
 
