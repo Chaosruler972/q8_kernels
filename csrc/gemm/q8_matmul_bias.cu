@@ -1,3 +1,5 @@
+
+#include "amdsupport.h"
 #include <torch/extension.h>
 #include <torch/python.h>
 #include "q8_gemm_api.cuh"
@@ -489,10 +491,10 @@ void run_q8_gemm_bias(int8_t *A, int8_t *B,  float* bias, void *C, float* A_scal
     
     using AScaleTV = Layout<Shape<
                                 Shape<
-                                    Shape<_4, _8>, Shape<_2, _2>,
+                                    Shape<_4, _8>, Shape<_2, _2>
                                 >, 
                                 Shape<_2, _4>
-                            >, 
+                            >,
                             Stride<
                                 Stride<Stride<_0, _1>, Stride<_16, _0>>, 
                                 Stride<_8, _32>
@@ -510,7 +512,7 @@ void run_q8_gemm_bias(int8_t *A, int8_t *B,  float* bias, void *C, float* A_scal
 
     using BScaleTV = Layout<Shape<
                                 Shape<
-                                    Shape<_4, _8>, Shape<_2, _2>,
+                                    Shape<_4, _8>, Shape<_2, _2>
                                 >, 
                                 Shape<_2, _8>
                             >, 
@@ -550,7 +552,7 @@ void run_q8_gemm_bias(int8_t *A, int8_t *B,  float* bias, void *C, float* A_scal
                                                 s2r_copy_atom_a, s2r_copy_atom_b, 
                                                 R2SCopyAtomC, S2GCopyAtomC, S2GCopyC>;
                 cudaFuncSetAttribute(
-                                kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shm_size);
+                                (const void*) kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shm_size);
                 kernel<<<grid, block, shm_size, stream>>>((int8_t*)A, (int8_t*)B, bias, A_scales, B_scales, (float_e4m3_t*)C, M, N, K, BATCH););
         );
     );

@@ -21,7 +21,6 @@ void run_q8_gemm(int8_t *A, int8_t *B, void *C, float* A_scales, float* B_scales
 
 
 torch::Tensor q8_mm(torch::Tensor a, torch::Tensor b, torch::Tensor a_scales, torch::Tensor b_scales, bool fuse_gelu){
-
     CHECK_INPUT(a);
     CHECK_INPUT(b);
 
@@ -73,7 +72,6 @@ torch::Tensor q8_mm(torch::Tensor a, torch::Tensor b, torch::Tensor a_scales, to
 
 
 torch::Tensor q8_mm_bias(torch::Tensor a, torch::Tensor b, torch::Tensor bias, torch::Tensor a_scales, torch::Tensor b_scales, bool fuse_gelu){
-
     CHECK_INPUT(a);
     CHECK_INPUT(b);
     CHECK_INPUT(bias);
