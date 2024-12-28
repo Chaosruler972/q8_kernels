@@ -77,6 +77,24 @@
         "xlocmon": "cpp",
         "xlocnum": "cpp",
         "xloctime": "cpp",
-        "xmemory": "cpp"
+        "xmemory": "cpp",
+        "__config": "cpp",
+        "cassert": "cpp"
+    },
+    "cmake.ignoreCMakeListsMissing": true,
+    "files.exclude": {
+        "**.egg-info": true,
+        "**/*_hip.cpp": true,
+        "**/*_hip.cuh": true,
+        "**/*_hip.h*": true,
+        "**/*.hip": true,
+        "build": true,
+    },
+    "remote.autoForwardPorts": false,
+    "search.exclude": {
+        "third_party": true
+    },
+    "files.watcherExclude": {
+        "third_party": true
     }
 }
