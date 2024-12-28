@@ -12,7 +12,7 @@ RUN apt update
 RUN wget https://repo.radeon.com/amdgpu-install/6.2.3/ubuntu/`cat /root/ubuntu_codename`/amdgpu-install_6.2.60203-1_all.deb
 RUN apt install -y ./amdgpu-install_6.2.60203-1_all.deb
 
-RUN amdgpu-install -y --usecase=workstation,rocm --accept-eula
+RUN amdgpu-install -y --usecase=workstation,rocm,hip --accept-eula
 
 ARG PYTHON_VERSION="3.10"
 RUN add-apt-repository ppa:deadsnakes/ppa -y
@@ -38,5 +38,6 @@ RUN chmod +x /root/_inner_build_script_docker.sh
 # Installing CUDA for compatbility, remove thrust
 RUN apt install nvidia-cuda-toolkit -y
 # Make thrust unnreachable
-RUN mv /usr/include/thrust/ /usr/include/thrust.bak
+RUN apt-get install nvidia-cuda-dev -y
+RUN mv /usr/include/thrust /usr/include/thrust.bak
 CMD [ "/root/_inner_build_script_docker.sh"]

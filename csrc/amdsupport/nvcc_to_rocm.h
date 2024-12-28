@@ -4,6 +4,7 @@
 #include <hip/amd_detail/amd_hip_bf16.h>
 #include <hip/amd_detail/amd_hip_fp8.h>
 #include <hip/amd_detail/amd_warp_sync_functions.h>
+#include <hip/amd_detail/hip_ldg.h>
 
 typedef hipFloatComplex cuFloatComplex;
 typedef hipDoubleComplex cuDoubleComplex;
@@ -45,4 +46,6 @@ constexpr int min_constexpr(int a, int b) {
 
 #define __CUDA__
 
+
+__device__ inline static __half __ldg(const __half* ptr) { return *ptr; }
 

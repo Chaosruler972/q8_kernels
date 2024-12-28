@@ -41,6 +41,7 @@ rocm_flags = [
     '-I/opt/rocm/include',
     '-I/opt/rocm/llvm/include/',
     '-DHIP_ENABLE_WARP_SYNC_BUILTINS=1',
+    '-DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_HIP',
 ]
 
 chosen_flags = cuda_flags if is_nvidia else rocm_flags
