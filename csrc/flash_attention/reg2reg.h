@@ -79,15 +79,15 @@ CUTLASS_DEVICE auto operator()(Fragment &accum) {
     // for (int k = 0; k < NT * size<2>(VT) / 2; ++k) {
     for (int k = 0; k < NT / 2; ++k) {
 
-      auto upper = *reinterpret_cast<uint32_t*>(&data[n]); //前4个value FP8,正好组成一个int32
-      auto lower = *reinterpret_cast<uint32_t*>(&data[n+4]); //后四个value
+      unsigned int upper = (unsigned int) (*reinterpret_cast<uint32_t*>(&data[n])); //前4个value FP8,正好组成一个int32
+      unsigned int lower = (unsigned int) (*reinterpret_cast<uint32_t*>(&data[n+4])); //后四个value
       
-      auto upper0 = __byte_perm(upper, lower, selectorEx0);
-      auto lower0 = __byte_perm(upper, lower, selectorEx1);      
-      upper0 = __shfl_sync(uint32_t(-1),upper0, upper_map[threadIdx.x%4],4);
-      lower0 = __shfl_sync(uint32_t(-1),lower0, lower_map[threadIdx.x%4],4);
+      unsigned int upper0 = __byte_perm(upper, lower, selectorEx0);
+      unsigned int lower0 = __byte_perm(upper, lower, selectorEx1);      
+      upper0 = __shfl_sync(shfl_mask_t(-1),upper0, upper_map[threadIdx.x%4],4);
+      lower0 = __shfl_sync(shfl_mask_t(-1),lower0, lower_map[threadIdx.x%4],4);
   
-      uint32_t *data_32bit = reinterpret_cast<uint32_t *>(&data[n]);
+      uint32_t* data_32bit = reinterpret_cast<uint32_t *>(&data[n]);
       data_32bit[0] = __byte_perm(upper0, lower0, selectorEx4);
       data_32bit[1] = __byte_perm(upper0, lower0, selectorEx5);
       n += 8;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "amdsupport.h"
+
 // cuda header file that use nvcc to compile, which can recognize the cuda
 // keyword like __global__ and __device__
 

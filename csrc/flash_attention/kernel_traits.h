@@ -1,10 +1,14 @@
 #pragma once
 
+#ifdef __HIP__
+#include <cute/tensor_hip.hpp>
+#else
 #include "cute/algorithm/copy.hpp"
+#include <cutlass/numeric_types.h>
+#endif // __HIP__
 
 #include "cutlass/cutlass.h"
 #include "cutlass/layout/layout.h"
-#include <cutlass/numeric_types.h>
 
 
 using namespace cute;

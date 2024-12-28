@@ -11,12 +11,13 @@ __device__ inline float operator()(float const &x, float const &y) { return max(
 };
 
 
+#ifndef __HIP__
 template <>
 struct MaxOp<half2> {
 // This is slightly faster
 __device__ inline half2 operator()(half2 const &x, half2 const &y) { return __hmax2(x, y); }
 };
-
+#endif // __HIP__
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<typename T>
@@ -37,7 +38,7 @@ struct Allreduce {
     template<typename T, typename Operator>
     static __device__ inline T run(T x, Operator &op) {
         constexpr int OFFSET = THREADS / 2;
-        x = op(x, __shfl_xor_sync(uint32_t(-1), x, OFFSET));
+        x = op(x, __shfl_xor_sync(shfl_mask_t(-1), x, OFFSET));
         return Allreduce<OFFSET>::run(x, op);
     }
 };
@@ -48,7 +49,7 @@ template<>
 struct Allreduce<2> {
 template<typename T, typename Operator> 
 static __device__ inline T run(T x, Operator &op) {
-    x = op(x, __shfl_xor_sync(uint32_t(-1), x, 1));
+    x = op(x, __shfl_xor_sync(shfl_mask_t(-1), x, 1));
     return x;
 }
 };

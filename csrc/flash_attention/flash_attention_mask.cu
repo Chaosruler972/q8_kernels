@@ -1,17 +1,28 @@
+#include "amdsupport.h"
 #include <cassert>
 #include <cmath>
+#ifdef __HIP__
+#include <hip/hip_runtime.h>
+#define CUTE_HOST_DEVICE __forceinline__ __host__ __device__
+#define CUTE_DEVICE      __forceinline__          __device__
+#define CUTE_HOST        __forceinline__ __host_
+#include <cute/int_tuple.hpp>
+#else
 #include <cuda.h>
 #include <cuda_runtime.h>
-#include <iostream>
-#include <stdio.h>
 #include <cutlass/numeric_conversion.h>
 #include <cutlass/numeric_types.h>
-#include <vector>
-
-#include "cute/algorithm/copy.hpp"
+#include <cute/algorithm/copy.hpp>
+#include <cute/algorithm/gemm.hpp>
+#include <cute/container/array_subbyte.hpp>
+#include <cute/container/array.hpp>
 
 #include "cutlass/cutlass.h"
 #include "cutlass/layout/layout.h"
+#endif
+#include <iostream>
+#include <stdio.h>
+#include <vector>
 
 #include "kernel_traits.h"
 #include "utils.h"
@@ -19,7 +30,6 @@
 
 #include "sm89_mma.hpp"
 #include "mma_sm89_traits.hpp"
-
 
 
 namespace flash {
@@ -93,8 +103,8 @@ template <bool Is_even_MN=true,
           typename Engine2, typename Layout2>
 __forceinline__ __device__ void copy_qk(TiledCopy tiled_copy, Tensor<Engine0, Layout0> const &S,
                             Tensor<Engine1, Layout1> &D, Tensor<Engine2, Layout2> const &identity_MN, const int max_MN=0) {
-    CUTE_STATIC_ASSERT_V(rank(S) == Int<3>{});
-    CUTE_STATIC_ASSERT_V(rank(D) == Int<3>{});
+    CUTE_STATIC_ASSERT_V(cute::rank(S) == Int<3>{});
+    CUTE_STATIC_ASSERT_V(cute::rank(D) == Int<3>{});
     CUTE_STATIC_ASSERT_V(size<0>(S) == size<0>(D));                     // MMA
     CUTE_STATIC_ASSERT_V(size<1>(S) == size<1>(D));                     // MMA_M
     CUTE_STATIC_ASSERT_V(size<2>(S) == size<2>(D));                     // MMA_K
@@ -115,8 +125,8 @@ template <bool Is_even_MN=true,
           typename Engine2, typename Layout2>
 __forceinline__ __device__ void copy_v(TiledCopy tiled_copy, Tensor<Engine0, Layout0> const &S,
                             Tensor<Engine1, Layout1> &D, Tensor<Engine2, Layout2> const &identity_MN, const int max_MN=0) {
-    CUTE_STATIC_ASSERT_V(rank(S) == Int<3>{});
-    CUTE_STATIC_ASSERT_V(rank(D) == Int<3>{});
+    CUTE_STATIC_ASSERT_V(cute::rank(S) == Int<3>{});
+    CUTE_STATIC_ASSERT_V(cute::rank(D) == Int<3>{});
     CUTE_STATIC_ASSERT_V(size<0>(S) == size<0>(D));                     // MMA
     CUTE_STATIC_ASSERT_V(size<1>(S) == size<1>(D));                     // MMA_M
     CUTE_STATIC_ASSERT_V(size<2>(S) == size<2>(D));                     // MMA_K
@@ -188,7 +198,7 @@ inline __device__ void scale_apply_exp2(Tensor<Engine0, Layout0> &tensor, Tensor
 template<typename Layout>
 inline __device__ auto convert_layout_acc_rowcol(Layout acc_layout) {
     static_assert(decltype(size<0>(acc_layout))::value == 4);
-    static_assert(decltype(rank(acc_layout))::value == 3);
+    static_assert(decltype(cute::rank(acc_layout))::value == 3);
     auto l = logical_divide(acc_layout, Shape<_2>{});  // ((2, 2), MMA_M, MMA_N)
     return make_layout(make_layout(get<1>(get<0>(l)), get<1>(l)), make_layout(get<0>(get<0>(l)), get<2>(l)));
 };
@@ -550,7 +560,7 @@ void flash_attention_cuda_mask(void* Q_ptr, void* K_ptr, void* V_ptr, int* Batch
             auto kernel = &flash_attention_v2_cutlass_mask_kernel<true>;
             int smem_size = int(N_BLOCK*64*2 + M_BLOCK*64);
             if (smem_size >= 48 * 1024) {
-                cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
+                cudaFuncSetAttribute((const void*) kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
             }
             kernel<<<grid, block, smem_size, stream>>>((float_e4m3_t*)Q_ptr, (float_e4m3_t*)K_ptr, (float_e4m3_t*)V_ptr, BatchMask, (float_e4m3_t*)O_ptr, BATCH, NUM_HEADS, M, N, softmax_scale);
             // C10_CUDA_KERNEL_LAUNCH_CHECK();
@@ -558,7 +568,7 @@ void flash_attention_cuda_mask(void* Q_ptr, void* K_ptr, void* V_ptr, int* Batch
             auto kernel = &flash_attention_v2_cutlass_mask_kernel<false>;
             int smem_size = int(N_BLOCK*64*2 + M_BLOCK*64);
             if (smem_size >= 48 * 1024) {
-                cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
+                cudaFuncSetAttribute((const void*) kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
             }
             kernel<<<grid, block, smem_size, stream>>>((float_e4m3_t*)Q_ptr, (float_e4m3_t*)K_ptr, (float_e4m3_t*)V_ptr, BatchMask, (float_e4m3_t*)O_ptr, BATCH, NUM_HEADS, M, N, softmax_scale);
             // C10_CUDA_KERNEL_LAUNCH_CHECK();

@@ -17,34 +17,35 @@ void flash_attention_cuda(void* Q_ptr, void* K_ptr, void* V_ptr,
 
 torch::Tensor flash_attention(torch::Tensor& q, torch::Tensor& k,
               torch::Tensor& v, float softmax_scale, c10::optional<at::Tensor>& batch_mask_){
+    return q;
 
-    int bs = q.size(0);
-    int head = q.size(1);
-    int seqlen = q.size(2);
-    int kseqlen = k.size(2);
-    int dim = q.size(3);
-    auto opts = q.options();
+    // int bs = q.size(0);
+    // int head = q.size(1);
+    // int seqlen = q.size(2);
+    // int kseqlen = k.size(2);
+    // int dim = q.size(3);
+    // auto opts = q.options();
 
-    at::cuda::CUDAGuard device_guard{(char)q.get_device()};
-    auto stream = at::cuda::getCurrentCUDAStream().stream();
+    // at::cuda::CUDAGuard device_guard{(char)q.get_device()};
+    // auto stream = at::cuda::getCurrentCUDAStream().stream();
     
-    auto out = torch::empty_like(q);
-    softmax_scale = softmax_scale*1.44269504088896340736f;
+    // auto out = torch::empty_like(q);
+    // softmax_scale = softmax_scale*1.44269504088896340736f;
 
-    if(batch_mask_.has_value()){
-        at::Tensor batch_mask;
-        batch_mask = batch_mask_.value();
-        TORCH_CHECK(batch_mask.dtype() == torch::kInt32, "flash attn: mask type error");
-        TORCH_CHECK(batch_mask.size(0) == bs, "flash attn: mask batch error");
-        flash_attention_cuda_mask(q.data_ptr(), k.data_ptr(), v.data_ptr(), batch_mask.data_ptr<int>(),  out.data_ptr(), 
-                  bs, seqlen, kseqlen, head, softmax_scale, stream);
-    } else {
-        flash_attention_cuda(q.data_ptr(), k.data_ptr(), v.data_ptr(),
-                  out.data_ptr(), 
-                  bs, seqlen, kseqlen, head, softmax_scale, stream);
+    // if(batch_mask_.has_value()){
+    //     at::Tensor batch_mask;
+    //     batch_mask = batch_mask_.value();
+    //     TORCH_CHECK(batch_mask.dtype() == torch::kInt32, "flash attn: mask type error");
+    //     TORCH_CHECK(batch_mask.size(0) == bs, "flash attn: mask batch error");
+    //     flash_attention_cuda_mask(q.data_ptr(), k.data_ptr(), v.data_ptr(), batch_mask.data_ptr<int>(),  out.data_ptr(), 
+    //               bs, seqlen, kseqlen, head, softmax_scale, stream);
+    // } else {
+    //     flash_attention_cuda(q.data_ptr(), k.data_ptr(), v.data_ptr(),
+    //               out.data_ptr(), 
+    //               bs, seqlen, kseqlen, head, softmax_scale, stream);
     
-    }
-    return out;
+    // }
+    // return out;
 }
 
 
