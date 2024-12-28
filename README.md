@@ -30,11 +30,17 @@ git submodule init
 git submodule update
 ```
 
-AMD ONLY:
-Now ensure thrust is not in your system include path, since it may conflict with your build
+Install docker buildx
 ```
-sudo apt-get remove --purge libthrust-dev
+apt update
+apt install docker-buildx -y
 ```
+
+Run the docker installer
+```
+./build_docker.sh
+```
+
 
 ```
 python setup.py install
