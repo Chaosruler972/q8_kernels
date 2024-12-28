@@ -28,7 +28,15 @@ git clone https://github.com/KONAKONA666/q8_kernels
 cd q8_kernels 
 git submodule init
 git submodule update
+```
 
+AMD ONLY:
+Now ensure thrust is not in your system include path, since it may conflict with your build
+```
+sudo apt-get remove --purge libthrust-dev
+```
+
+```
 python setup.py install
 pip install . # for utility
 ```
