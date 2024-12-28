@@ -37,5 +37,6 @@ RUN chmod +x /root/_inner_build_script_docker.sh
 
 # Installing CUDA for compatbility, remove thrust
 RUN apt install nvidia-cuda-toolkit -y
-RUN apt remove libthrust-dev -y
+# Make thrust unnreachable
+RUN mv /usr/include/thrust/ /usr/include/thrust.bak
 CMD [ "/root/_inner_build_script_docker.sh"]
