@@ -1,5 +1,6 @@
 import subprocess
 import os
+import multiprocessing
 from packaging.version import parse, Version
 from pathlib import Path
 from setuptools import setup, find_packages
@@ -15,8 +16,55 @@ PACKAGE_NAME = "q8_kernels"
 ext_modules = []
 generator_flag = []
 cc_flag = []
-cc_flag.append("-gencode")
-cc_flag.append("arch=compute_89,code=sm_89")
+
+
+
+# Find better way to find out if it is nvidia or amd
+is_nvidia = False
+is_amd = True
+
+
+if is_nvidia:
+    cc_flag.append("-gencode")
+    cc_flag.append("arch=compute_89,code=sm_89")
+
+cuda_flags = [
+    '--ptxas-options=-v',
+    '--ptxas-options=-O2',
+    '--expt-relaxed-constexpr',
+    '--expt-extended-lambda',
+    '--use_fast_math',
+    "-lineinfo",
+]
+
+rocm_flags = [
+    '-I/opt/rocm/include',
+    '-I/opt/rocm/llvm/include/',
+    '-DHIP_ENABLE_WARP_SYNC_BUILTINS=1',
+]
+
+chosen_flags = cuda_flags if is_nvidia else rocm_flags
+
+
+
+# ninja build does not work unless include_dirs are abs path
+this_dir = os.path.dirname(os.path.abspath(__file__))
+
+nvidia_includes = [
+    Path('/usr') / 'local' / 'cuda' / 'include',
+    Path(this_dir) / "third_party/cutlass/include",
+    Path(this_dir) / "third_party/cutlass/tools/utils/include" ,
+    Path(this_dir) / "third_party/cutlass/examples/common" ,
+]
+
+rocm_includes = [
+    Path('/opt') / 'rocm' / 'include',
+    Path(this_dir) / "third_party/cutlass_hip/include",
+    Path(this_dir) / "third_party/cutlass_hip/tools/utils/include" ,
+    Path(this_dir) / "third_party/cutlass_hip/examples/common" ,
+]
+
+chosen_includes = nvidia_includes if is_nvidia else rocm_includes
 
 
 # helper function to get cuda version
@@ -32,11 +80,10 @@ def get_cuda_bare_metal_version(cuda_dir):
 if CUDA_HOME is not None:
     _, bare_metal_version = get_cuda_bare_metal_version(CUDA_HOME)
     if bare_metal_version >= Version("11.8"):
-        cc_flag.append("-gencode")
-        cc_flag.append("arch=compute_89,code=sm_89")
+        if is_nvidia:
+            cc_flag.append("-gencode")
+            cc_flag.append("arch=compute_89,code=sm_89")        
 
-# ninja build does not work unless include_dirs are abs path
-this_dir = os.path.dirname(os.path.abspath(__file__))
 
 # cuda module
 ext_modules.append(
@@ -53,30 +100,22 @@ ext_modules.append(
             "cxx": ["-O3", "-std=c++17"] + generator_flag,
             # add nvcc compile flags
             "nvcc": [
+                    *chosen_flags,
                     "-O3",
                     "-std=c++17",
                     "-U__CUDA_NO_HALF_OPERATORS__",
-                    "-lineinfo",
-                    "--ptxas-options=-v",
-                    "--ptxas-options=-O2",
                     "-U__CUDA_NO_HALF_OPERATORS__",
                     "-U__CUDA_NO_HALF_CONVERSIONS__",
                     "-U__CUDA_NO_HALF2_OPERATORS__",
                     "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
-                    "--expt-relaxed-constexpr",
-                    "--expt-extended-lambda",
-                    "--use_fast_math",
-
                 ]
                 + generator_flag
                 + cc_flag,
         },
         include_dirs=[
+            *chosen_includes,
+            Path(this_dir) / "csrc" / "amdsupport",
             Path(this_dir) / "csrc" / "gemm",
-            Path(this_dir) / "third_party/cutlass/include",
-            Path(this_dir) / "third_party/cutlass/tools/utils/include" ,
-            Path(this_dir) / "third_party/cutlass/examples/common" ,
-            # Path(this_dir) / "some" / "thing" / "more",
         ],
     )
 )
@@ -87,37 +126,29 @@ ext_modules.append(
         name="q8_kernels_cuda.quantizer._C",
         sources=[
             "csrc/quantizer/tokenwise_quant.cpp",
-            "csrc/quantizer/tokenwise_quant_cuda.cu",
+            "csrc/quantizer/tokenwise_quant.cu",
         ],
           extra_compile_args={
             # add c compile flags
             "cxx": ["-O3", "-std=c++17"] + generator_flag,
             # add nvcc compile flags
             "nvcc": [
+                    *chosen_flags,
                     "-O3",
                     "-std=c++17",
                     "-U__CUDA_NO_HALF_OPERATORS__",
-                    "-lineinfo",
-                    "--ptxas-options=-v",
-                    "--ptxas-options=-O2",
                     "-U__CUDA_NO_HALF_OPERATORS__",
                     "-U__CUDA_NO_HALF_CONVERSIONS__",
                     "-U__CUDA_NO_HALF2_OPERATORS__",
                     "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
-                    "--expt-relaxed-constexpr",
-                    "--expt-extended-lambda",
-                    "--use_fast_math",
-
                 ]
                 + generator_flag
                 + cc_flag,
         },
         include_dirs=[
+            *chosen_includes,
+            Path(this_dir) / "csrc" / "amdsupport",
             Path(this_dir) / "csrc"/"quantizer",
-            Path(this_dir) / "third_party/cutlass/include",
-            Path(this_dir) / "third_party/cutlass/tools/utils/include" ,
-            Path(this_dir) / "third_party/cutlass/examples/common" ,
-            # Path(this_dir) / "some" / "thing" / "more",
         ],
     )
 )
@@ -131,48 +162,39 @@ ext_modules.append(
             "csrc/ops/ops_api.cpp",
             
             "csrc/ops/rope.cpp",
-            "csrc/ops/rope_cuda.cu",
+            "csrc/ops/rope.cu",
             
             "csrc/ops/rms_norm.cpp",
-            "csrc/ops/rms_norm_cuda.cu",
+            "csrc/ops/rms_norm.cu",
 
             "csrc/ops/fma.cpp",
-            "csrc/ops/fma_cuda.cu",
+            "csrc/ops/fma.cu",
 
             "csrc/fast_hadamard/fast_hadamard_transform.cpp",
-            "csrc/fast_hadamard/fast_hadamard_transform_cuda.cu"
+            "csrc/fast_hadamard/fast_hadamard_transform.cu"
         ],
           extra_compile_args={
             # add c compile flags
             "cxx": ["-O3", "-std=c++17"] + generator_flag,
             # add nvcc compile flags
             "nvcc": [
+                    *chosen_flags,
                     "-O3",
                     "-std=c++17",
                     "-U__CUDA_NO_HALF_OPERATORS__",
-                    "-lineinfo",
-                    "--ptxas-options=-v",
-                    "--ptxas-options=-O2",
                     "-U__CUDA_NO_HALF_OPERATORS__",
                     "-U__CUDA_NO_HALF_CONVERSIONS__",
                     "-U__CUDA_NO_HALF2_OPERATORS__",
                     "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
-                    "--expt-relaxed-constexpr",
-                    "--expt-extended-lambda",
-                    "--use_fast_math",
-
                 ]
                 + generator_flag
                 + cc_flag,
         },
         include_dirs=[
+            *chosen_includes,
+            Path(this_dir) / "csrc" / "amdsupport",
             Path(this_dir) / "csrc"/"ops",
             Path(this_dir) / "csrc"/"fast_hadamard",
-            
-            Path(this_dir) / "third_party/cutlass/include",
-            Path(this_dir) / "third_party/cutlass/tools/utils/include" ,
-            Path(this_dir) / "third_party/cutlass/examples/common" ,
-            # Path(this_dir) / "some" / "thing" / "more",
         ],
     )
 )
@@ -184,37 +206,30 @@ ext_modules.append(
         name="q8_kernels_cuda.flash_attention._C",
         sources=[
             "csrc/flash_attention/flash_attention.cpp",
-            "csrc/flash_attention/flash_attention_cuda.cu",
-            "csrc/flash_attention/flash_attention_cuda_mask.cu",
+            "csrc/flash_attention/flash_attention.cu",
+            "csrc/flash_attention/flash_attention_mask.cu",
         ],
           extra_compile_args={
             # add c compile flags
             "cxx": ["-O3", "-std=c++17"] + generator_flag,
             # add nvcc compile flags
             "nvcc": [
+                    *chosen_flags,
                     "-O3",
                     "-std=c++17",
                     "-U__CUDA_NO_HALF_OPERATORS__",
-                    "--use_fast_math",
-                    "-lineinfo",
-                    "--ptxas-options=-v",
-                    "--ptxas-options=-O2",
                     "-U__CUDA_NO_HALF_OPERATORS__",
                     "-U__CUDA_NO_HALF_CONVERSIONS__",
                     "-U__CUDA_NO_HALF2_OPERATORS__",
                     "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
-                    "--expt-relaxed-constexpr",
-                    "--expt-extended-lambda",
                 ]
                 + generator_flag
                 + cc_flag,
         },
         include_dirs=[
+            *chosen_includes,
+            Path(this_dir) / "csrc" / "amdsupport",
             Path(this_dir) / "csrc"/"flash_attention",
-            Path(this_dir) / "third_party/cutlass/include",
-            Path(this_dir) / "third_party/cutlass/tools/utils/include" ,
-            Path(this_dir) / "third_party/cutlass/examples/common" ,
-            # Path(this_dir) / "some" / "thing" / "more",
         ],
     )
 )
